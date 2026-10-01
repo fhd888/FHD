@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vértice Finanzas</title>
+<style>
+:root {
+  --bg: #0f172a;
+  --card-bg: #1e293b;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --green: #10b981;
+  --red: #ef4444;
+  --border: #334155;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+body { background-color: var(--bg); color: var(--text); padding: 24px; max-width: 1000px; margin: 0 auto; }
+
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+.card { background-color: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); margin-bottom: 20px; }
+
+h1 { font-size: 1.6rem; margin-bottom: 4px; }
+h2 { font-size: 1.1rem; color: var(--text); margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.label { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
+.balance-display { font-size: 2.4rem; font-weight: bold; margin: 8px 0; }
+
+.row { display: flex; gap: 12px; margin-bottom: 12px; }
+input, select {
+  flex: 1;
+  padding: 10px 12px;
+  background: #0b1120;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+input:focus, select:focus { outline: 1px solid var(--accent); }
+
+button {
+  background-color: var(--accent);
+  color: #fff;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: background-color 0.2s;
+}
+button:hover { background-color: var(--accent-hover); }
+
+.item-list { list-style: none; max-height: 240px; overflow-y: auto; }
+.item-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.item-row:last-child { border-bottom: none; }
+.income { color: var(--green); font-weight: 600; }
+.expense { color: var(--red); font-weight: 600; }
+.delete-btn { background: none; border: none; color: var(--text-muted); width: auto; cursor: pointer; padding: 0 4px; }
+.delete-btn:hover { color: var(--red); }
+
+.progress-bar-bg { background: #0b1120; border-radius: 999px; height: 10px; width: 100%; overflow: hidden; margin-top: 6px; }
+.progress-bar-fill { background: var(--accent); height: 100%; width: 0%; transition: width 0.3s; }
+
+footer {
+  text-align: center;
+  margin-top: 32px;
+  padding: 16px 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+</style>
+</head>
+<body>
+
+<header style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+  <div>
+    <h1>Vértice Finanzas</h1>
+    <p class="label">Control de Flujo, Ahorro e Inversión</p>
+  </div>
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <label for="monthFilter" class="label" style="text-transform: none;">Filtrar mes:</label>
+    <input type="month" id="monthFilter" style="width: auto;" onchange="saveAndRender()" />
+  </div>
+</header>
+
+<div class="card">
+  <span class="label">Balance Neto Disponible (<span id="currentMonthLabel">Mes Actual</span>)</span>
+  <div class="balance-display" id="netBalance">$0.00</div>
+  <p class="label" id="summaryStats">Ingresos: $0.00 | Gastos: $0.00</p>
+</div>
+
+<div class="grid-2">
+  <!-- Registrar Movimiento -->
+  <div class="card">
+    <h2>Registrar Movimiento</h2>
+    <form id="txForm">
+      <div class="row">
+        <input type="text" id="txDesc" placeholder="Concepto (ej. Sueldo, Alquiler)" required />
+        <input type="number" id="txAmount" placeholder="Monto" step="0.01" required />
+      </div>
+      <div class="row">
+        <select id="txType">
+          <option value="income">Ingreso (+)</option>
+          <option value="expense">Gasto (-)</option>
+        </select>
+        <select id="txCategory">
+          <option value="General">General</option>
+          <option value="Vivienda">Vivienda</option>
+          <option value="Alimentación">Alimentación</option>
+          <option value="Inversión">Inversión</option>
+          <option value="Negocio">Negocio</option>
+        </select>
+        <input type="month" id="txMonth" required />
+      </div>
+      <button type="submit">Añadir Transacción</button>
+    </form>
+
+    <div style="margin-top: 20px;">
+      <span class="label">Historial del Mes</span>
+      <ul class="item-list" id="txList"></ul>
+    </div>
+  </div>
+
+  <!-- Metas de Ahorro / Estrategia -->
+  <div class="card">
+    <h2>Metas de Ahorro & Portafolio</h2>
+    <form id="goalForm">
+      <div class="row">
+        <input type="text" id="goalName" placeholder="Meta (ej. Fondo Emergencia)" required />
+        <input type="number" id="goalTarget" placeholder="Meta ($)" step="0.01" required />
+      </div>
+      <div class="row">
+        <input type="number" id="goalCurrent" placeholder="Monto Inicial a Dedicar ($)" step="0.01" />
+        <select id="goalDeductType">
+          <option value="Inversión">Deducir como Inversión</option>
+          <option value="Gasto">Deducir como Gasto</option>
+        </select>
+      </div>
+      <button type="submit">Crear Meta y Deducir Saldo</button>
+    </form>
+
+    <div style="margin-top: 20px;">
+      <span class="label">Progreso de Objetivos</span>
+      <div id="goalsList" style="margin-top: 10px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Simulador de Inversión y Estrategia -->
+<div class="card">
+  <h2>Simulador de Inversión (Interés Compuesto)</h2>
+  <div class="row">
+    <input type="number" id="simInitial" placeholder="Capital Inicial ($)" value="1000" />
+    <input type="number" id="simMonthly" placeholder="Aporte Mensual ($)" value="200" />
+    <input type="number" id="simRate" placeholder="Rendimiento Anual (%)" value="8" />
+    <input type="number" id="simYears" placeholder="Años" value="10" />
+  </div>
+  <button type="button" onclick="calculateCompoundInterest()">Calcular Proyección</button>
+  <div style="margin-top: 16px; font-size: 1.1rem;" id="simResult">
+    Proyección estimada: <strong>$0.00</strong>
+  </div>
+</div>
+
+<footer>
+  Parte de Financial Health Development 2026
+</footer>
+
+<script>
+// Inicializar mes por defecto en formato YYYY-MM
+const now = new Date();
+const currentMonthIso = now.toISOString().slice(0, 7);
+document.getElementById('monthFilter').value = currentMonthIso;
+document.getElementById('txMonth').value = currentMonthIso;
+
+// Estado local
+let transactions = JSON.parse(localStorage.getItem('vf_transactions')) || [];
+let goals = JSON.parse(localStorage.getItem('vf_goals')) || [];
+
+const formatCurrency = (num) => '$' + Number(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function saveAndRender() {
+  localStorage.setItem('vf_transactions', JSON.stringify(transactions));
+  localStorage.setItem('vf_goals', JSON.stringify(goals));
+
+  const selectedMonth = document.getElementById('monthFilter').value;
+  document.getElementById('currentMonthLabel').innerText = selectedMonth || 'Todos';
+
+  // Filtrar transacciones por el mes seleccionado
+  const filteredTxs = transactions.filter(t => !selectedMonth || t.month === selectedMonth);
+
+  // Balance
+  let income = 0;
+  let expenses = 0;
+  filteredTxs.forEach(t => {
+    if (t.type === 'income') income += t.amount;
+    else expenses += t.amount;
+  });
+  const net = income - expenses;
+  document.getElementById('netBalance').innerText = formatCurrency(net);
+  document.getElementById('summaryStats').innerText = `Ingresos: ${formatCurrency(income)} | Gastos: ${formatCurrency(expenses)}`;
+
+  // Lista de transacciones
+  const txList = document.getElementById('txList');
+  txList.innerHTML = '';
+  filteredTxs.slice().reverse().forEach((t) => {
+    const originalIndex = transactions.indexOf(t);
+    const li = document.createElement('li');
+    li.className = 'item-row';
+    li.innerHTML = `
+      <div>
+        <strong>${t.desc}</strong> <small style="color: var(--text-muted)">(${t.category} - ${t.month})</small>
+      </div>
+      <div>
+        <span class="${t.type}">${t.type === 'income' ? '+' : '-'}${formatCurrency(t.amount)}</span>
+        <button class="delete-btn" onclick="removeTx(${originalIndex})">✕</button>
+      </div>
+    `;
+    txList.appendChild(li);
+  });
+
+  // Metas
+  const goalsList = document.getElementById('goalsList');
+  goalsList.innerHTML = '';
+  goals.forEach((g, idx) => {
+    const percent = Math.min(Math.round((g.current / g.target) * 100), 100);
+    const div = document.createElement('div');
+    div.style.marginBottom = '14px';
+    div.innerHTML = `
+      <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+        <span>${g.name}</span>
+        <span>${formatCurrency(g.current)} / ${formatCurrency(g.target)} (${percent}%)</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" style="width: ${percent}%;"></div>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 6px;">
+        <button style="padding: 4px 8px; font-size: 0.75rem;" onclick="addFundsToGoal(${idx})">+ Abonar</button>
+        <button class="delete-btn" style="font-size: 0.8rem;" onclick="removeGoal(${idx})">Eliminar</button>
+      </div>
+    `;
+    goalsList.appendChild(div);
+  });
+}
+
+// Formulario de Transacciones
+document.getElementById('txForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const desc = document.getElementById('txDesc').value;
+  const amount = parseFloat(document.getElementById('txAmount').value);
+  const type = document.getElementById('txType').value;
+  const category = document.getElementById('txCategory').value;
+  const month = document.getElementById('txMonth').value || document.getElementById('monthFilter').value;
+
+  transactions.push({ desc, amount, type, category, month, date: new Date().toISOString() });
+  document.getElementById('txDesc').value = '';
+  document.getElementById('txAmount').value = '';
+  saveAndRender();
+});
+
+// Formulario de Metas (Deducción automática del saldo)
+document.getElementById('goalForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = document.getElementById('goalName').value;
+  const target = parseFloat(document.getElementById('goalTarget').value);
+  const current = parseFloat(document.getElementById('goalCurrent').value) || 0;
+  const deductType = document.getElementById('goalDeductType').value;
+  const activeMonth = document.getElementById('monthFilter').value || currentMonthIso;
+
+  if (current > 0) {
+    // Se deduce del balance registrándolo como gasto o inversión
+    transactions.push({
+      desc: `Aporte inicial a meta: ${name}`,
+      amount: current,
+      type: 'expense',
+      category: deductType,
+      month: activeMonth,
+      date: new Date().toISOString()
+    });
+  }
+
+  goals.push({ name, target, current });
+  document.getElementById('goalForm').reset();
+  saveAndRender();
+});
+
+function removeTx(index) {
+  transactions.splice(index, 1);
+  saveAndRender();
+}
+
+function removeGoal(index) {
+  goals.splice(index, 1);
+  saveAndRender();
+}
+
+function addFundsToGoal(index) {
+  const val = prompt("Monto a abonar y deducir del saldo:");
+  if (val && !isNaN(val) && parseFloat(val) > 0) {
+    const amount = parseFloat(val);
+    const categoryChoice = confirm("¿Deseas clasificarlo como 'Inversión'? (Aceptar = Inversión, Cancelar = Gasto General)") ? "Inversión" : "Gasto";
+    const activeMonth = document.getElementById('monthFilter').value || currentMonthIso;
+
+    goals[index].current += amount;
+
+    // Se descuenta directamente registrando el movimiento
+    transactions.push({
+      desc: `Abono a meta: ${goals[index].name}`,
+      amount: amount,
+      type: 'expense',
+      category: categoryChoice,
+      month: activeMonth,
+      date: new Date().toISOString()
+    });
+
+    saveAndRender();
+  }
+}
+
+// Calculadora Interés Compuesto
+function calculateCompoundInterest() {
+  const p = parseFloat(document.getElementById('simInitial').value) || 0;
+  const pmt = parseFloat(document.getElementById('simMonthly').value) || 0;
+  const annualRate = (parseFloat(document.getElementById('simRate').value) || 0) / 100;
+  const years = parseFloat(document.getElementById('simYears').value) || 0;
+
+  const r = annualRate / 12;
+  const n = years * 12;
+
+  let total = p * Math.pow(1 + r, n);
+  if (r > 0) {
+    total += pmt * ((Math.pow(1 + r, n) - 1) / r);
+  } else {
+    total += pmt * n;
+  }
+
+  const totalAportado = p + (pmt * n);
+  const intereses = total - totalAportado;
+
+  document.getElementById('simResult').innerHTML = `
+    Proyección a ${years} años: <strong>${formatCurrency(total)}</strong><br>
+    <span style="font-size: 0.85rem; color: var(--text-muted)">
+      Capital aportado: ${formatCurrency(totalAportado)} | Ganancia por interés: ${formatCurrency(intereses)}
+    </span>
+  `;
+}
+
+// Inicializar
+saveAndRender();
+calculateCompoundInterest();
+</script>
+</body>
+</html>
